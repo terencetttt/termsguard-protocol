@@ -1,8 +1,9 @@
 'use client'
 
-import { createClient, isSuccessful } from 'genlayer-js'
+import { abi as genlayerAbi, createClient, isSuccessful } from 'genlayer-js'
 import { studionet, testnetAsimov, testnetBradbury } from 'genlayer-js/chains'
 import { TransactionHashVariant } from 'genlayer-js/types'
+import { fromHex, zeroAddress } from 'viem'
 
 export const METHODS = {
   createAgreement: 'create_agreement', addRequirement: 'add_requirement', freezeAgreement: 'freeze_agreement',
@@ -40,15 +41,44 @@ export function readClient(config = getNetworkConfig()) {
 }
 
 export async function walletClient(config: NetworkConfig, provider: any, address: `0x${string}`) {
-  const client = createClient({ chain: chainFor(config), account: address, provider })
-  await (client as any).connect(config.chainKey)
-  return client as any
+  // Providers and chain selection are already handled by the EIP-1193 flow.
+  // GenLayerJS `connect()` additionally requests the MetaMask GenLayer Snap,
+  // which is not needed for ordinary wallet signing and fails on other wallets.
+  return createClient({ chain: chainFor(config), account: address, provider })
 }
 
 export async function readMethod<T>(method: string, args: unknown[] = [], config = getNetworkConfig()): Promise<T> {
   if (!config) throw new Error('Network is not configured')
   const client = readClient(config) as any
-  return client.readContract({ address: config.contractAddress, functionName: method, args, transactionHashVariant: TransactionHashVariant.LATEST_FINAL }) as Promise<T>
+  // The current Studionet node still expects the legacy `method` calldata key.
+  // genlayer-js 2.0.0-rc.1 encodes it as the empty-string key, which reaches
+  // GenVM as a missing method and returns "Missing or invalid parameters".
+  const encodedCall = genlayerAbi.calldata.encode({ method, ...(args.length ? { args } : {}) } as any)
+  const data = genlayerAbi.transactions.serialize([encodedCall, false])
+  const result = await client.request({
+    method: 'gen_call',
+    params: [{
+      type: 'read',
+      to: config.contractAddress,
+      from: zeroAddress,
+      data,
+      transaction_hash_variant: TransactionHashVariant.LATEST_FINAL,
+    }],
+  })
+  const resultHex = typeof result === 'string' ? result : result?.data
+  if (typeof resultHex !== 'string') throw new Error('GenLayer RPC returned no contract result data')
+  const decoded = genlayerAbi.calldata.decode(fromHex(resultHex.startsWith('0x') ? resultHex : `0x${resultHex}`, 'bytes'))
+  return toJsonSafe(decoded) as T
+}
+
+function toJsonSafe(value: any): any {
+  if (value instanceof Map) return Object.fromEntries(Array.from(value.entries(), ([key, item]) => [key, toJsonSafe(item)]))
+  if (Array.isArray(value)) return value.map(toJsonSafe)
+  if (typeof value === 'bigint') return value <= BigInt(Number.MAX_SAFE_INTEGER) && value >= BigInt(Number.MIN_SAFE_INTEGER) ? Number(value) : value.toString()
+  if (value instanceof Uint8Array) return `0x${Array.from(value, byte => byte.toString(16).padStart(2, '0')).join('')}`
+  if (value && typeof value === 'object' && value.bytes instanceof Uint8Array) return toJsonSafe(value.bytes)
+  if (value && typeof value === 'object') return Object.fromEntries(Object.entries(value).map(([key, item]) => [key, toJsonSafe(item)]))
+  return value
 }
 
 export async function writeMethod(method: string, args: unknown[], account: any, config: NetworkConfig, onSubmitted?: (hash: string) => void) {
