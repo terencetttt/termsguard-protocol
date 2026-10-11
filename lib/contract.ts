@@ -74,22 +74,61 @@ function toJsonSafe(value: any): any {
   return value
 }
 
-export async function writeMethod(method: string, args: unknown[], account: any, config: NetworkConfig, onSubmitted?: (hash: string) => void) {
+export async function writeMethod(
+  method: string,
+  args: unknown[],
+  account: any,
+  config: NetworkConfig,
+  onSubmitted?: (hash: string) => void,
+) {
   const client = account.client as any
-  const estimate = await client.estimateTransactionFeesForWrite({ address: config.contractAddress, functionName: method, args })
-  const hash = await client.writeContract({ address: config.contractAddress, functionName: method, args, fees: { distribution: estimate.distribution, feeValue: estimate.feeValue } }) as string
+
+  const hash = await client.writeContract({
+    address: config.contractAddress,
+    functionName: method,
+    args,
+  }) as string
+
   onSubmitted?.(hash)
-  const receipt = await client.waitForFinalization({ hash, fullTransaction: true })
-  if (!isSuccessful(receipt)) {
-    const detail = `${receipt?.statusName || 'unknown status'} / ${receipt?.txExecutionResultName || 'unknown execution result'}`
-    throw Object.assign(new Error(`Transaction finalized unsuccessfully: ${detail}`), { txHash: hash, receipt })
+
+  const receipt = await client.waitForTransactionReceipt({
+  hash,
+  status: 'FINALIZED',
+  interval: 5000,
+  retries: 100,
+  fullTransaction: true,
+})
+
+  const executionSucceeded =
+  receipt?.consensus_data?.leader_receipt?.some(
+    (entry: any) => entry?.execution_result === 'SUCCESS',
+  )
+
+
+
+if (!executionSucceeded) {
+    const detail =
+      `${receipt?.statusName || 'unknown status'} / ` +
+      `${receipt?.result_name || 'unknown consensus result'}`
+
+    throw Object.assign(
+      new Error(`Transaction finalized unsuccessfully: ${detail}`),
+      { txHash: hash, receipt },
+    )
   }
+
   return { hash, receipt }
+}export function explorerTxUrl(config: NetworkConfig | null, hash: string) {
+  return config?.explorerUrl
+    ? `${config.explorerUrl.replace(/\/$/, '')}/tx/${hash}`
+    : ''
 }
 
-function isSuccessful(receipt: any) {
-  return receipt?.statusName === 'FINALIZED' && receipt?.txExecutionResultName === 'SUCCESS'
+export function explorerAddressUrl(
+  config: NetworkConfig | null,
+  address: string,
+) {
+  return config?.explorerUrl
+    ? `${config.explorerUrl.replace(/\/$/, '')}/address/${address}`
+    : ''
 }
-
-export function explorerTxUrl(config: NetworkConfig | null, hash: string) { return config?.explorerUrl ? `${config.explorerUrl.replace(/\/$/, '')}/tx/${hash}` : '' }
-export function explorerAddressUrl(config: NetworkConfig | null, address: string) { return config?.explorerUrl ? `${config.explorerUrl.replace(/\/$/, '')}/address/${address}` : '' }

@@ -30,9 +30,9 @@ test('wallet setup uses the EIP-1193 provider without requiring the MetaMask Gen
 
 test('writes wait for finalization and inspect execution success', async () => {
   const source = await read('lib/contract.ts')
-  assert.match(source, /waitForFinalization/)
-  assert.match(source, /isSuccessful\(receipt\)/)
-  assert.match(source, /estimateTransactionFeesForWrite/)
+  assert.match(source, /waitForTransactionReceipt/)
+assert.match(source, /execution_result\s*===\s*['"]SUCCESS['"]/)
+assert.doesNotMatch(source, /estimateTransactionFeesForWrite/)
 })
 
 test('evidence workflow submits only the URL and bounded label', async () => {
