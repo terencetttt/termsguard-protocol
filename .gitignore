@@ -1,0 +1,12 @@
+node_modules/
+.next/
+out/
+coverage/
+.env*
+!.env.example
+*.py[cod]
+__pycache__/
+.pytest_cache/
+artifacts/
+*.tsbuildinfo
+.vercel/
