@@ -1,9 +1,8 @@
 'use client'
 
-import { abi as genlayerAbi, createClient, isSuccessful } from 'genlayer-js'
+import { createClient } from 'genlayer-js'
 import { studionet, testnetAsimov, testnetBradbury } from 'genlayer-js/chains'
 import { TransactionHashVariant } from 'genlayer-js/types'
-import { fromHex, zeroAddress } from 'viem'
 
 export const METHODS = {
   createAgreement: 'create_agreement', addRequirement: 'add_requirement', freezeAgreement: 'freeze_agreement',
@@ -47,29 +46,22 @@ export async function walletClient(config: NetworkConfig, provider: any, address
   return createClient({ chain: chainFor(config), account: address, provider })
 }
 
-export async function readMethod<T>(method: string, args: unknown[] = [], config = getNetworkConfig()): Promise<T> {
+export async function readMethod<T>(
+  method: string,
+  args: unknown[] = [],
+  config = getNetworkConfig()
+): Promise<T> {
   if (!config) throw new Error('Network is not configured')
   const client = readClient(config) as any
-  // The current Studionet node still expects the legacy `method` calldata key.
-  // genlayer-js 2.0.0-rc.1 encodes it as the empty-string key, which reaches
-  // GenVM as a missing method and returns "Missing or invalid parameters".
-  const encodedCall = genlayerAbi.calldata.encode({ method, ...(args.length ? { args } : {}) } as any)
-  const data = genlayerAbi.transactions.serialize([encodedCall, false])
-  const result = await client.request({
-    method: 'gen_call',
-    params: [{
-      type: 'read',
-      to: config.contractAddress,
-      from: zeroAddress,
-      data,
-      transaction_hash_variant: TransactionHashVariant.LATEST_FINAL,
-    }],
+
+  const result = await client.readContract({
+    address: config.contractAddress,
+    functionName: method,
+    args,
+    transactionHashVariant: TransactionHashVariant.LATEST_FINAL,
   })
-  const resultHex = typeof result === 'string' ? result : result?.data
-  if (typeof resultHex !== 'string') throw new Error('GenLayer RPC returned no contract result data')
-  const prefixedResult = (resultHex.startsWith('0x') ? resultHex : `0x${resultHex}`) as `0x${string}`
-  const decoded = genlayerAbi.calldata.decode(fromHex(prefixedResult, 'bytes'))
-  return toJsonSafe(decoded) as T
+
+  return toJsonSafe(result) as T
 }
 
 function toJsonSafe(value: any): any {
@@ -93,6 +85,10 @@ export async function writeMethod(method: string, args: unknown[], account: any,
     throw Object.assign(new Error(`Transaction finalized unsuccessfully: ${detail}`), { txHash: hash, receipt })
   }
   return { hash, receipt }
+}
+
+function isSuccessful(receipt: any) {
+  return receipt?.statusName === 'FINALIZED' && receipt?.txExecutionResultName === 'SUCCESS'
 }
 
 export function explorerTxUrl(config: NetworkConfig | null, hash: string) { return config?.explorerUrl ? `${config.explorerUrl.replace(/\/$/, '')}/tx/${hash}` : '' }

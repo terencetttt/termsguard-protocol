@@ -12,26 +12,26 @@
     "test:contract": "python -m unittest discover -s tests -v"
   },
   "dependencies": {
-    "genlayer-js": "2.0.0-rc.1",
+    "genlayer-js": "^1.1.8",
     "lucide-react": "^0.468.0",
     "next": "^16.4.0",
     "react": "^19.2.3",
     "react-dom": "^19.2.3"
   },
   "devDependencies": {
+    "@eslint/js": "^9.0.0",
+    "@tailwindcss/postcss": "^4.3.3",
     "@types/node": "^20.14.0",
     "@types/react": "^19.3.0",
+    "@types/react-dom": "^19.3.0",
     "autoprefixer": "^10.4.0",
     "eslint": "^9.0.0",
-    "postcss": "^8.4.0",
-    "tailwindcss": "^4.3.3",
-    "typescript": "^5.5.0",
-    "@eslint/js": "^9.0.0",
     "eslint-plugin-react": "^7.37.0",
     "eslint-plugin-react-hooks": "^7.1.0",
     "globals": "^16.4.0",
-    "typescript-eslint": "^8.56.0",
-    "@tailwindcss/postcss": "^4.3.3",
-    "@types/react-dom": "^19.3.0"
+    "postcss": "^8.4.0",
+    "tailwindcss": "^4.3.3",
+    "typescript": "^5.5.0",
+    "typescript-eslint": "^8.56.0"
   }
 }

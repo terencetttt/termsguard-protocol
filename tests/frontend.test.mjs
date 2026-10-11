@@ -13,12 +13,13 @@ test('frontend method registry matches contract method names', async () => {
   assert.ok(names.includes('get_adjudication_for_evidence'))
 })
 
-test('frontend reads use the GenLayer legacy method-key calldata expected by the live RPC', async () => {
+test('frontend reads use GenLayer SDK readContract at latest finalized state', async () => {
   const source = await read('lib/contract.ts')
-  assert.match(source, /genlayerAbi\.calldata\.encode\(\{ method, /)
-  assert.match(source, /genlayerAbi\.transactions\.serialize\(\[encodedCall, false\]\)/)
-  assert.match(source, /transaction_hash_variant: TransactionHashVariant\.LATEST_FINAL/)
-  assert.doesNotMatch(source, /client\.readContract\(/)
+  assert.match(source, /client\.readContract\(/)
+  assert.match(source, /functionName:\s*method/)
+  assert.match(source, /transactionHashVariant:\s*TransactionHashVariant\.LATEST_FINAL/)
+  assert.doesNotMatch(source, /genlayerAbi\.calldata\.encode/)
+  assert.doesNotMatch(source, /method:\s*'gen_call'/)
 })
 
 test('wallet setup uses the EIP-1193 provider without requiring the MetaMask GenLayer Snap', async () => {
