@@ -67,7 +67,8 @@ export async function readMethod<T>(method: string, args: unknown[] = [], config
   })
   const resultHex = typeof result === 'string' ? result : result?.data
   if (typeof resultHex !== 'string') throw new Error('GenLayer RPC returned no contract result data')
-  const decoded = genlayerAbi.calldata.decode(fromHex(resultHex.startsWith('0x') ? resultHex : `0x${resultHex}`, 'bytes'))
+  const prefixedResult = (resultHex.startsWith('0x') ? resultHex : `0x${resultHex}`) as `0x${string}`
+  const decoded = genlayerAbi.calldata.decode(fromHex(prefixedResult, 'bytes'))
   return toJsonSafe(decoded) as T
 }
 
